@@ -34,7 +34,7 @@ import { ClaimReviewPage } from "@/components/claim-review-page"
 const claims = [
   {
     id: "CLM-2025-004",
-    customerName: "David Thompson",
+    customerName: "David Tester Thompson",
     dateSubmitted: "2025-07-05",
     claimType: "Collision",
     status: "New",
