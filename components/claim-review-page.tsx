@@ -30,8 +30,10 @@ import {
   X,
 } from "lucide-react"
 import { generateObject } from "ai"
-import openai from "@/lib/openai"
 import { z } from "zod"
+
+import openai from "@/lib/openai"
+import { fileToBase64 } from "@/lib/utils"
 
 // --- Schema & helpers -------------------------------------------------
 const operationCanonical = (o: string) => {
@@ -103,7 +105,7 @@ const getClaimDetails = (claim: any) => ({
     licenseNumber: "DL123456789",
   },
   vehicle:
-    claim.id === "CLM-2024-004"
+    claim.id === "CLM-2025-004"
       ? {
           year: 2021,
           make: "Mazda",
@@ -140,7 +142,7 @@ const getClaimDetails = (claim: any) => ({
     ],
   },
   media:
-    claim.id === "CLM-2024-004"
+    claim.id === "CLM-2025-004"
       ? [
           {
             type: "image",
@@ -255,78 +257,47 @@ export function ClaimReviewPage({ claim }: ClaimReviewPageProps) {
     setIsAnalyzing(true)
 
     try {
-      const { object } = await generateObject({
-        model: openai("gpt-4o"),
-        schema: DamageAssessmentSchema,
-        temperature: 0.2,
-        prompt: `
-    You are an expert auto insurance damage assessor. You will be provided information about a vehicle and images of damages. Analyze the following vehicle accident and provide a detailed damage assessment.
+      // Convert uploaded files to base64 for API call
+      const photoFiles = []
+      for (const file of claimDetails.media) {
+        if (file.type.startsWith("image/")) {
+          try {
+            const base64 = await fileToBase64(file.file)
+            photoFiles.push({
+              name: file.name,
+              type: file.type,
+              data: base64,
+            })
+          } catch (error) {
+            console.error("Error converting file to base64:", error)
+          }
+        }
+      }
 
-    Vehicle Information:
-    - ${claimDetails.vehicle.year} ${claimDetails.vehicle.make} ${claimDetails.vehicle.model}
-
-    Accident Description:
-    ${claimDetails.accident.description}
-
-    Media Files Available:
-    ${claimDetails.media.map((m) => `- ${m.name} (${m.type})`).join("\n")}
-
-    Please provide a comprehensive damage assessment including:
-    1. All likely damaged components based on the accident type and description
-    2. Recommended operation (Repair, Replace, R&I, Repaint)
-    3. Realistic labor hours for each item
-    4. Current market labor rate ($85/hour)
-    5. Parts cost estimates
-    6. Total cost per item
-    7. Confidence level for each assessment
-          CONFIDENCE LEVELS:
-          - "System Confident": High probability match based on typical damage patterns for this accident type. Damage is clearly visible or highly predictable. Examples: broken headlight in front-end collision, cracked bumper from rear-end impact.
-          - "Review Suggested": Medium probability damage that may occur but requires agent validation. Examples: paint damage that may extend beyond visible area, potential frame damage from moderate impact.
-          - "Requires Investigation": Low probability or damage that cannot be visually confirmed without inspection. Examples: wheel alignment issues, suspension damage, internal mechanical damage, airbag sensors that may need replacement.
-    8. Source reference for the assessment (repair manual, parts database, industry standard, etc.)
-      For each damage item, provide a credible source reference such as:
-      - Repair manual sections (e.g., "Mitchell Collision Repair Manual, Section 12.3")
-      - Parts databases (e.g., "OEM Parts Database - [Make Model Year] P/N: [part number]")
-      - Industry standards (e.g., "I-CAR Collision Repair Procedures")
-      - Paint manufacturer guidelines (e.g., "PPG Refinish Manual")
-      - Labor time guides (e.g., "Motor Labor Time Guide")
-
-    Consider typical damage patterns for this type of accident and vehicle model.
-
-    Return ONLY valid JSON that matches exactly this TypeScript type (no markdown):
-
-    type DamageResponse = {
-      damages: {
-        item: string
-        description: string
-        operation: "Repair" | "Replace" | "R&I" | "Repaint"
-        laborHours: number
-        laborRate: number
-        partsEstimate: number
-        total: number
-        source: string
-        confidence:
-          | "System Confident"
-          | "Review Suggested"
-          | "Requires Investigation"
-      }[]
-    }
-  `,
+      const response = await fetch('/api/openai-assess', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vehicle: claimDetails.vehicle,
+          accident: claimDetails.accident,
+          media: photoFiles,
+        }),
       })
 
-      // Update the damages with AI-generated assessment
+      if (!response.ok) throw new Error('Failed to analyze damages')
+      const object = await response.json()
+
       setClaimDetails((prev) => ({
         ...prev,
         damages: object.damages.map((d, index) => ({
-          id: String(Date.now() + index), // Generate unique IDs
+          id: String(Date.now() + index),
           ...d,
-          operation: operationCanonical(d.operation) as DamageItem["operation"],
-          confidence: confidenceCanonical(d.confidence) as DamageItem["confidence"],
+          operation: operationCanonical(d.operation),
+          confidence: confidenceCanonical(d.confidence),
         })),
       }))
     } catch (error) {
-      console.error("Error analyzing damages:", error)
-      // You could add a toast notification here for error handling
+      console.error('Error analyzing damages:', error)
     } finally {
       setIsAnalyzing(false)
     }
