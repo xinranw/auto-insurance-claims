@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     const response = await openAiInstance.responses.create({
       prompt: {
         id: promptId,
-        version: "4",
+        version: "5",
       },
       input: [
         {
