@@ -816,7 +816,7 @@ export function ClaimReviewPage({ claim }: ClaimReviewPageProps) {
                           )}
                         </TableCell>
                         <TableCell className="font-medium">{damage.item}</TableCell>
-                        <TableCell className="max-w-xs">
+                        <TableCell className="max-w-xs whitespace-normal">
                           <div className="flex items-center gap-2">
                             <p className="text-sm text-muted-foreground">{damage.description}</p>
                             <Tooltip>
