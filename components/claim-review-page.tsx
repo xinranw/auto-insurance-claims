@@ -33,7 +33,7 @@ import { generateObject } from "ai"
 import { z } from "zod"
 
 import openai from "@/lib/openai"
-import { fileToBase64 } from "@/lib/utils"
+import { fileToBase64, imageUrlToBase64 } from "@/lib/utils"
 
 // --- Schema & helpers -------------------------------------------------
 const operationCanonical = (o: string) => {
@@ -146,8 +146,8 @@ const getClaimDetails = (claim: any) => ({
       ? [
           {
             type: "image",
-            name: "front_damage_severe.jpg",
-            url: "/images/car-damage.jpeg",
+            name: "image_1.jpg",
+            url: "/images/image_1.jpeg",
             timestamp: "2024-01-12 15:20",
           },
         ]
@@ -260,9 +260,9 @@ export function ClaimReviewPage({ claim }: ClaimReviewPageProps) {
       // Convert uploaded files to base64 for API call
       const photoFiles = []
       for (const file of claimDetails.media) {
-        if (file.type.startsWith("image/")) {
+        if (file.type.startsWith("image")) {
           try {
-            const base64 = await fileToBase64(file.file)
+            const base64 = await imageUrlToBase64(file.url)
             photoFiles.push({
               name: file.name,
               type: file.type,
@@ -274,7 +274,7 @@ export function ClaimReviewPage({ claim }: ClaimReviewPageProps) {
         }
       }
 
-      const response = await fetch('/api/openai-assess', {
+      const response = await fetch('/api/analyze-damages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
