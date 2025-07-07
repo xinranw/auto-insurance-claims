@@ -29,11 +29,7 @@ import {
   Upload,
   X,
 } from "lucide-react"
-import { generateObject } from "ai"
-import { z } from "zod"
-
-import openai from "@/lib/openai"
-import { fileToBase64, imageUrlToBase64 } from "@/lib/utils"
+import { imageUrlToBase64 } from "@/lib/utils"
 
 // --- Schema & helpers -------------------------------------------------
 const operationCanonical = (o: string) => {
@@ -46,24 +42,6 @@ const operationCanonical = (o: string) => {
 
 const confidenceCanonical = (c: string) =>
   /requires/i.test(c) ? "Requires Investigation" : /review/i.test(c) ? "Review Suggested" : "System Confident"
-
-const DamageAssessmentSchema = z.object({
-  damages: z
-    .array(
-      z.object({
-        item: z.string(),
-        description: z.string(),
-        operation: z.string(),
-        laborHours: z.coerce.number(),
-        laborRate: z.coerce.number(),
-        partsEstimate: z.coerce.number(),
-        total: z.coerce.number(),
-        confidence: z.string(),
-        source: z.string(),
-      }),
-    )
-    .min(1),
-})
 
 // Damage item type
 type DamageItem = {
@@ -416,51 +394,33 @@ export function ClaimReviewPage({ claim }: ClaimReviewPageProps) {
     setIsEstimatingCosts(true)
 
     try {
-      const { object } = await generateObject({
-        model: openai("gpt-4o"),
-        schema: z.object({
-          laborHours: z.coerce.number(),
-          partsEstimate: z.coerce.number(),
-          source: z.string(),
+      const response = await fetch('/api/estimate-costs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vehicle: claimDetails.vehicle,
+          repairItem: {
+            item: formData.item,
+            description: formData.description,
+            operation: formData.operation,
+          },
         }),
-        temperature: 0.2,
-        prompt: `
-You are an expert auto repair cost estimator. Provide accurate cost estimates for the following repair item.
-
-Vehicle Information:
-- ${claimDetails.vehicle.year} ${claimDetails.vehicle.make} ${claimDetails.vehicle.model}
-
-Repair Item Details:
-- Item: ${formData.item}
-- Description: ${formData.description}
-- Operation: ${formData.operation}
-
-Please provide:
-1. Labor hours required for this specific operation
-2. Parts cost estimate (set to 0 if no parts needed, like for paint-only work)
-3. Source reference for your estimate
-
-Consider:
-- Current market rates and typical repair times
-- Vehicle-specific factors (luxury vs economy, part availability)
-- Operation complexity (Repair vs Replace vs R&I vs Repaint)
-
-Return ONLY valid JSON:
-{
-  "laborHours": number,
-  "partsEstimate": number,
-  "source": "credible source reference"
-}
-      `,
       })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to estimate costs')
+      }
+
+      const estimateData = await response.json()
 
       // Update form data with AI estimates
       const updatedForm = {
         ...formData,
-        laborHours: object.laborHours,
-        partsEstimate: object.partsEstimate,
-        source: object.source,
-        total: calculateTotal(object.laborHours, formData.laborRate || 85, object.partsEstimate),
+        laborHours: estimateData.laborHours,
+        partsEstimate: estimateData.partsEstimate,
+        source: estimateData.source,
+        total: calculateTotal(estimateData.laborHours, formData.laborRate || 85, estimateData.partsEstimate),
       }
 
       setFormData(updatedForm)
