@@ -855,7 +855,7 @@ export function ClaimReviewPage({ claim }: ClaimReviewPageProps) {
                 <div className="mt-4 p-4 bg-muted rounded-lg">
                   <div className="flex justify-between items-center">
                     <span className="font-medium">Total Estimated Cost:</span>
-                    <span className="text-xl font-bold">${totalEstimate.toLocaleString()}</span>
+                    <span className="text-xl font-bold">{totalEstimate.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</span>
                   </div>
                 </div>
               </CardContent>
