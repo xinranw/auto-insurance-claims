@@ -156,7 +156,9 @@ const getClaimDetails = (claim: any) => ({
             duration: "0:45",
           },
         ],
-  damages: [
+  damages: claim.id === "CLM-2025-004"
+    ? []
+    :[
     {
       id: "1",
       item: "Front Bumper",
@@ -224,10 +226,10 @@ export function ClaimReviewPage({ claim }: ClaimReviewPageProps) {
   const [hasAiEstimate, setHasAiEstimate] = useState(false)
 
   useEffect(() => {
-    if (claim.status === "new") {
+    if (claim.status.toLowerCase() === "new") {
       handleReAnalyze()
     }
-  }, [claim.id, claim.status])
+  }, [])
 
   const totalEstimate = claimDetails.damages.reduce((sum, damage) => sum + damage.total, 0)
 
